@@ -2,7 +2,7 @@
 pragma solidity ^0.7.6;
 pragma experimental ABIEncoderV2;
 
-import {Test, console} from "forge-std/Test.sol";
+import {Test, console} from "lib/forge-std/src/Test.sol";
 import {PuppyRaffle} from "../src/PuppyRaffle.sol";
 
 contract PuppyRaffleTest is Test {
@@ -16,11 +16,7 @@ contract PuppyRaffleTest is Test {
     uint256 duration = 1 days;
 
     function setUp() public {
-        puppyRaffle = new PuppyRaffle(
-            entranceFee,
-            feeAddress,
-            duration
-        );
+        puppyRaffle = new PuppyRaffle(entranceFee, feeAddress, duration);
     }
 
     //////////////////////
@@ -213,4 +209,26 @@ contract PuppyRaffleTest is Test {
         puppyRaffle.withdrawFees();
         assertEq(address(feeAddress).balance, expectedPrizeAmount);
     }
+
+    function testReentranctyInRefund() public {
+        // arrange
+        // playerAddress must be in active players array;
+        puppyRaffle.enterRaffle({value: entranceFee})(playerOne);
+        bool inRaffle = puppyRaffle.players.length > 0;
+        console.log("Attacker in raffle? ", inRaffle);
+
+        // the getActivePlayerIndex function is exernal, the attacker (playerOne)has to call it
+        vm.prank(playerOne);
+        // uint256 playerIndex = getActivePlayerIndex(playerOne);
+        // we need to pass refund the playerIndex in the players array
+        // console.log("Player index: ", playerIndex);
+        // puppyRaffle.refund(playerIndex);
+        // act
+
+        // assert
+    }
+
+    // contract ReenterPuppyraffle (PuppyRaffle) {
+
+    // }
 }

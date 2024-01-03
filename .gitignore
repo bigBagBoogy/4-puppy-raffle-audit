@@ -9,6 +9,8 @@ out/
 
 # Docs
 docs/
+bigbagboogy.md
+node_modules
 
 # Dotenv file
 .env

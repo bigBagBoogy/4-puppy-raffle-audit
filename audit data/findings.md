@@ -1,0 +1,1 @@
+### [H-1] Looping through players array to check for duplicates in `PuppyRaffle::enterRaffle` is a potential denial of service (DoS)

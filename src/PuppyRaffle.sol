@@ -18,6 +18,7 @@ import {Base64} from "lib/base64/base64.sol";
 contract PuppyRaffle is ERC721, Ownable {
     using Address for address payable;
 
+    // @audit info: can be constant
     uint256 public immutable entranceFee;
 
     address[] public players;
@@ -83,6 +84,7 @@ contract PuppyRaffle is ERC721, Ownable {
         }
 
         // Check for duplicates
+        // @audit DoS attack. players.length can be inflated to where the cost is too high
         for (uint256 i = 0; i < players.length - 1; i++) {
             for (uint256 j = i + 1; j < players.length; j++) {
                 require(players[i] != players[j], "PuppyRaffle: Duplicate player");
