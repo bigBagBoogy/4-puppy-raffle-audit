@@ -210,7 +210,7 @@ contract PuppyRaffleTest is Test {
         assertEq(address(feeAddress).balance, expectedPrizeAmount);
     }
 
-    function test_ReentranctyInRefund() public {
+    function test_originalReentranctyInRefund() public {
         // arrange
         address[] memory players = new address[](4);
         players[0] = playerOne;

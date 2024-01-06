@@ -27,6 +27,8 @@ contract PuppyRaffle is ERC721, Ownable {
     address public previousWinner;
 
     // We do some storage packing to save gas
+    // @audit-info: check for zero address
+    // input validation
     address public feeAddress;
     uint64 public totalFees = 0;
 
@@ -103,6 +105,7 @@ contract PuppyRaffle is ERC721, Ownable {
         payable(msg.sender).sendValue(entranceFee);
 
         players[playerIndex] = address(0);
+        // @audit [low] even if playerIndex is 0 this event is emitted
         emit RaffleRefunded(playerAddress);
     }
 

